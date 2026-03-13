@@ -21,49 +21,49 @@ def get_menu_items(context: UserAccountContext, category: Optional[str] = None) 
     """
     menu = {
         "kimbap": [
-            "🍙 Original Kimbap - $3.50 (Vegetables, egg, pickled radish)",
-            "🐟 Tuna Kimbap - $4.00 (Tuna mayo, vegetables)",
-            "🥩 Beef Kimbap - $4.50 (Marinated beef, vegetables)",
-            "🌱 Vegetable Kimbap - $3.00 (Fresh vegetables only)",
-            "🧀 Cheese Kimbap - $4.00 (Mozzarella cheese, vegetables)",
+            "🍙 오리지널 김밥 - 3,500원 (야채, 계란, 단무지)",
+            "🐟 참치 김밥 - 4,000원 (참치 마요, 야채)",
+            "🥩 소고기 김밥 - 4,500원 (양념 소고기, 야채)",
+            "🌱 야채 김밥 - 3,000원 (신선한 야채만 사용)",
+            "🧀 치즈 김밥 - 4,000원 (모짜렐라 치즈, 야채)",
         ],
         "rice": [
-            "🍳 Kimchi Fried Rice - $6.50 (Spicy kimchi, egg, vegetables)",
-            "🥩 Beef Fried Rice - $7.50 (Marinated beef, egg, vegetables)",
-            "🍤 Shrimp Fried Rice - $8.00 (Fresh shrimp, egg, vegetables)",
-            "🌶️ Spicy Pork Rice - $7.00 (Gochujang pork, vegetables)",
+            "🍳 김치볶음밥 - 6,500원 (매콤한 김치, 계란, 야채)",
+            "🥩 소고기볶음밥 - 7,500원 (양념 소고기, 계란, 야채)",
+            "🍤 새우볶음밥 - 8,000원 (새우, 계란, 야채)",
+            "🌶️ 제육덮밥 - 7,000원 (고추장 돼지고기, 야채)",
         ],
         "noodles": [
-            "🍜 Original Ramen - $4.50 (Classic Korean instant noodles)",
-            "🧀 Cheese Ramen - $5.50 (Ramen with mozzarella cheese)",
-            "🥟 Dumpling Ramen - $6.00 (Ramen with vegetable dumplings)",
-            "🌶️ Spicy Cold Noodles - $7.00 (Bibim naengmyeon)",
+            "🍜 라면 - 4,500원 (클래식 라면)",
+            "🧀 치즈라면 - 5,500원 (모짜렐라 치즈 추가)",
+            "🥟 만두라면 - 6,000원 (야채 만두 추가)",
+            "🌶️ 비빔냉면 - 7,000원 (매콤한 비빔냉면)",
         ],
         "side_dishes": [
-            "🍢 Tteokbokki - $5.00 (Rice cakes in spicy sauce)",
-            "🥟 Fried Dumplings - $4.00 (6 pieces, vegetable/meat)",
-            "🍳 Egg Roll - $3.50 (Korean-style rolled omelette)",
-            "🥗 Korean Salad - $3.00 (Fresh vegetables with sesame dressing)",
+            "🍢 떡볶이 - 5,000원 (매콤한 양념)",
+            "🥟 군만두 - 4,000원 (6개, 야채/고기)",
+            "🍳 계란말이 - 3,500원 (한국식 계란말이)",
+            "🥗 한국식 샐러드 - 3,000원 (참깨 드레싱)",
         ],
         "drinks": [
-            "🥤 Korean Soda - $2.00 (Various flavors)",
-            "☕ Iced Coffee - $2.50 (Korean-style sweet coffee)",
-            "🍵 Green Tea - $2.00 (Hot/Iced)",
-            "🥛 Banana Milk - $2.50 (Korean banana flavored milk)",
+            "🥤 한국식 소다 - 2,000원 (다양한 맛)",
+            "☕ 아이스커피 - 2,500원 (한국식 달달한 커피)",
+            "🍵 녹차 - 2,000원 (핫/아이스)",
+            "🥛 바나나우유 - 2,500원 (바나나맛 우유)",
         ]
     }
     
     if category and category in menu:
         items = menu[category]
-        return f"📋 {category.title()} Menu:\n" + "\n".join(items)
+        return f"📋 {category.title()} 메뉴:\n" + "\n".join(items)
     elif not category:
         all_items = []
         for cat, items in menu.items():
             all_items.append(f"\n📍 {cat.upper()}:")
             all_items.extend(items)
-        return "🍱 FULL KIMBAP HEAVEN MENU:" + "\n".join(all_items)
+        return "🍱 김밥천국 전체 메뉴:" + "\n".join(all_items)
     else:
-        return f"❌ Category '{category}' not found. Available: kimbap, rice, noodles, side_dishes, drinks"
+        return f"❌ '{category}' 카테고리를 찾을 수 없습니다. 가능한 카테고리: kimbap, rice, noodles, side_dishes, drinks"
 
 
 @function_tool
