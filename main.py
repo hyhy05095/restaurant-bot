@@ -6,6 +6,8 @@ import asyncio
 import streamlit as st
 from agents import Runner, SQLiteSession, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 import pandas as pd
+import json
+import os
 
 from models import UserAccountContext
 from my_agents.triage_agent import triage_agent
@@ -14,6 +16,38 @@ from my_agents.agent_registry import setup_agent_handoffs
 setup_agent_handoffs()
 
 client = OpenAI()
+
+# ─── 회원 관리 (users.json) ──────────────────────────────────────
+USERS_FILE = "users.json"
+
+def load_users() -> dict:
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_user(name: str, tier: str = "basic"):
+    users = load_users()
+    if name not in users:
+        users[name] = {
+            "customer_id": len(users) + 1,
+            "tier": tier,
+            "email": f"{name.lower()}@kimbap.com"
+        }
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+        return False  # 신규 회원
+    return True  # 기존 회원
+
+def get_user(name: str) -> UserAccountContext:
+    users = load_users()
+    u = users[name]
+    return UserAccountContext(
+        customer_id=u["customer_id"],
+        name=name,
+        tier=u["tier"],
+        email=u["email"]
+    )
 
 # ─── 김밥천국 메뉴 데이터 ────────────────────────────────────────
 MENU_DATA = {
@@ -52,27 +86,17 @@ def show_menu_table():
     for tab, (category, items) in zip(tabs, MENU_DATA.items()):
         with tab:
             df = pd.DataFrame(items)
-            st.dataframe(
-                df,
-                use_container_width=True,
-                hide_index=True,
-            )
+            st.dataframe(df, use_container_width=True, hide_index=True)
 
-# ─── 김밥천국 테마 CSS ───────────────────────────────────────────
+# ─── CSS ─────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-
-html, body, [class*="css"] {
-    font-family: 'Noto Sans KR', sans-serif;
-}
-.stApp {
-    background-color: #fffdf5;
-}
+html, body, [class*="css"] { font-family: 'Noto Sans KR', sans-serif; }
+.stApp { background-color: #fffdf5; }
 .kimbap-header {
     background: linear-gradient(135deg, #e8000d, #c0000a);
-    color: white;
-    text-align: center;
+    color: white; text-align: center;
     padding: 18px 10px 12px 10px;
     border-radius: 0 0 18px 18px;
     margin-bottom: 18px;
@@ -81,13 +105,15 @@ html, body, [class*="css"] {
 .kimbap-header h1 { font-size: 2rem; font-weight: 900; letter-spacing: 2px; margin: 0; }
 .kimbap-header p { font-size: 0.85rem; margin: 4px 0 0 0; opacity: 0.88; }
 .welcome-box {
-    background: #fff8e1;
-    border-left: 5px solid #e8000d;
-    border-radius: 10px;
-    padding: 14px 18px;
-    margin-bottom: 20px;
-    font-size: 1rem;
-    color: #333;
+    background: #fff8e1; border-left: 5px solid #e8000d;
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+    font-size: 1rem; color: #333;
+}
+.login-box {
+    background: white; border: 2px solid #e8000d;
+    border-radius: 16px; padding: 32px 28px;
+    max-width: 400px; margin: 40px auto; text-align: center;
+    box-shadow: 0 4px 20px rgba(232,0,13,0.1);
 }
 .menu-card { background: white; border: 2px solid #e8000d; border-radius: 14px; padding: 18px 12px; text-align: center; margin-bottom: 8px; }
 .menu-card .icon { font-size: 2rem; }
@@ -109,16 +135,38 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ─── 세션 초기화 ─────────────────────────────────────────────────
-user_account_ctx = UserAccountContext(
-    customer_id=1,
-    name="Hana",
-    tier="premium",
-    email="Hana@gmail.com"
-)
+# ─── 로그인 화면 ─────────────────────────────────────────────────
+if "user_name" not in st.session_state:
+    st.markdown("""
+    <div class="login-box">
+        <div style="font-size:2.5rem">🍱</div>
+        <h3 style="color:#e8000d; margin: 8px 0">어서오세요!</h3>
+        <p style="color:#666; font-size:0.9rem">이름을 입력하고 시작하세요</p>
+    </div>
+    """, unsafe_allow_html=True)
 
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        name_input = st.text_input("이름", placeholder="이름을 입력하세요", label_visibility="collapsed")
+        if st.button("시작하기 →", use_container_width=True):
+            if name_input.strip():
+                is_existing = save_user(name_input.strip())
+                st.session_state["user_name"] = name_input.strip()
+                st.session_state["is_new_user"] = not is_existing
+                st.rerun()
+            else:
+                st.warning("이름을 입력해주세요!")
+    st.stop()  # 로그인 전까지 아래 코드 실행 안 함
+
+# ─── 유저 컨텍스트 설정 ──────────────────────────────────────────
+user_account_ctx = get_user(st.session_state["user_name"])
+
+# ─── 세션 초기화 ─────────────────────────────────────────────────
 if "session" not in st.session_state:
-    st.session_state["session"] = SQLiteSession("chat-history", "customer-support-memory.db")
+    st.session_state["session"] = SQLiteSession(
+        f"chat-{user_account_ctx.name}",  # 유저별 채팅 분리
+        "customer-support-memory.db"
+    )
 session = st.session_state["session"]
 
 if "agent" not in st.session_state:
@@ -152,13 +200,24 @@ async def has_history():
 has_prev = asyncio.run(has_history())
 
 if not has_prev and not st.session_state["chat_started"]:
-    st.markdown("""
-    <div class="welcome-box">
-        👋 안녕하세요! 여기는 <b>Kimbap Heaven</b>입니다.<br>
-        오늘도 건강한 하루 되세요 😊<br><br>
-        <b>무엇을 도와드릴까요?</b> 아래 버튼을 눌러 시작하거나, 직접 메시지를 입력해 주세요.
-    </div>
-    """, unsafe_allow_html=True)
+    # 신규/기존 회원 인사
+    if st.session_state.get("is_new_user"):
+        st.markdown(f"""
+        <div class="welcome-box">
+            🎉 환영해요, <b>{user_account_ctx.name}</b>님!<br>
+            Basic 멤버로 등록되었습니다 😊<br><br>
+            <b>무엇을 도와드릴까요?</b>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        tier_emoji = "🌟" if user_account_ctx.tier == "premium" else "👋"
+        st.markdown(f"""
+        <div class="welcome-box">
+            {tier_emoji} 다시 오셨군요, <b>{user_account_ctx.name}</b>님! 
+            ({user_account_ctx.tier.title()})<br><br>
+            <b>무엇을 도와드릴까요?</b>
+        </div>
+        """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -182,7 +241,6 @@ if not has_prev and not st.session_state["chat_started"]:
 
 # ─── 에이전트 실행 ───────────────────────────────────────────────
 async def run_agent(message):
-    # 메뉴 키워드 감지 시 표 먼저 출력
     if any(keyword in message for keyword in MENU_KEYWORDS):
         show_menu_table()
 
@@ -246,8 +304,10 @@ if message:
 # ─── 사이드바 ────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 🍱 어시스턴트 상태")
+    st.markdown(f"**👤 {user_account_ctx.name}** ({user_account_ctx.tier.title()})")
     agent_status = st.empty()
     agent_status.markdown(f"**현재:** {st.session_state['agent'].name}")
+
     reset = st.button("🔄 대화 초기화")
     if reset:
         asyncio.run(session.clear_session())
@@ -256,5 +316,12 @@ with st.sidebar:
         agent_status.markdown(f"**현재:** {triage_agent.name}")
         st.success("대화가 초기화되었습니다.")
         st.rerun()
+
+    # 로그아웃
+    if st.button("🚪 로그아웃"):
+        for key in ["user_name", "is_new_user", "session", "agent", "chat_started", "quick_input"]:
+            st.session_state.pop(key, None)
+        st.rerun()
+
     st.divider()
     st.caption("ⓒ Kimbap Heaven Customer Support")

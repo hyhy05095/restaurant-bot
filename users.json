@@ -1,0 +1,7 @@
+{
+  "hana": {
+    "customer_id": 1,
+    "tier": "basic",
+    "email": "hana@kimbap.com"
+  }
+}
