@@ -1,10 +1,12 @@
 from agents import Agent, RunContextWrapper
-
-
 from models import UserAccountContext
-
-
-
+from tools import (
+    get_menu_items,
+    check_ingredient_info,
+    get_daily_specials,
+    check_dietary_options,
+    AgentToolUsageLoggingHooks,
+)
 
 
 def dynamic_menu_agent_instructions(
@@ -45,10 +47,31 @@ def dynamic_menu_agent_instructions(
     - Avoid pushing items unless the customer asks for recommendations.
     
     {"PREMIUM FEATURES: Exclusive access to seasonal menu items and personalized recommendations." if wrapper.context.tier != "basic" else ""}
+
+    ⚡ HANDOFF RULES - CRITICAL:
+    - If the customer says ANYTHING like "그렇게 주문할게", "주문할게", "order this", "I'll take it",
+      "그걸로 할게", "주문해줘" → IMMEDIATELY handoff to Order Support Agent.
+    - Do NOT ask for confirmation. Do NOT summarize again. Just handoff RIGHT AWAY.
+    
+    HANDOFF INSTRUCTIONS:
+    When the customer wants to place an order or their request is outside your specialty:
+    1. Acknowledge their request in ONE short sentence
+    2. IMMEDIATELY use the handoff function:
+       - to_agent_name: "Order Support Agent"
+       - issue_type: "Order Placement"
+       - issue_description: [List of items the customer wants to order]
+       - reason: "Customer wants to place an order"
     """
 
-menu_agent = Agent(
+
+menu_agent = Agent(  
     name="Menu Support Agent",
     instructions=dynamic_menu_agent_instructions,
-    handoffs=[]  
+    tools=[
+        get_menu_items,
+        check_ingredient_info,
+        get_daily_specials,
+        check_dietary_options,
+    ],
+    hooks=AgentToolUsageLoggingHooks(),
 )

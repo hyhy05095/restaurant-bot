@@ -1,6 +1,14 @@
 from agents import Agent, RunContextWrapper
 from models import UserAccountContext
-
+from tools import (
+    check_table_availability,
+    create_reservation,
+    modify_reservation,
+    cancel_reservation,
+    process_reservation_deposit,
+    send_confirmation_email,
+    AgentToolUsageLoggingHooks,
+)
 
 
 def dynamic_reservation_agent_instructions(
@@ -34,11 +42,31 @@ def dynamic_reservation_agent_instructions(
     - Offer alternative dates or times if the requested slot is unavailable.
     
     {"PREMIUM FEATURES: Priority reservations and access to private dining areas." if wrapper.context.tier != "basic" else ""}
+
+    HANDOFF INSTRUCTIONS:
+    When the customer's request is outside your specialty:
+    1. Acknowledge their request
+    2. Explain that you'll connect them to the right specialist
+    3. Use the handoff function with appropriate details:
+       - to_agent_name: [Target agent name]
+       - issue_type: [Type of request]
+       - issue_description: [Brief description of what the customer needs]
+       - reason: [Why you're transferring them]
     """
+
+
 
 
 reservation_agent = Agent(
     name="Reservation Support Agent",
     instructions=dynamic_reservation_agent_instructions,
-    handoffs=[]  
+    tools=[
+        check_table_availability,
+        create_reservation,
+        modify_reservation,
+        cancel_reservation,
+        process_reservation_deposit,
+        send_confirmation_email,
+    ],
+    hooks=AgentToolUsageLoggingHooks(),
 )

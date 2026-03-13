@@ -4,17 +4,15 @@ dotenv.load_dotenv()
 from openai import OpenAI
 import asyncio
 import streamlit as st
-from agents import Runner, SQLiteSession, InputGuardrailTripwireTriggered, handoff
+from agents import Runner, SQLiteSession, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 
-from agents.extensions import handoff_filters 
-from models import UserAccountContext, HandoffData
+from models import UserAccountContext
 
 from my_agents.triage_agent import triage_agent
-from my_agents.menu_agent import menu_agent
-from my_agents.order_agent import order_agent
-from my_agents.reservation_agent import reservation_agent
-from my_agents.complaints_agent import complaints_agent
 
+from my_agents.agent_registry import setup_agent_handoffs
+
+setup_agent_handoffs()
 
 client = OpenAI()
 
@@ -24,33 +22,6 @@ user_account_ctx = UserAccountContext(
     tier="premium",
     email="Hana@gmail.com"
 )
-
-
-
-
-def handle_handoff(wrapper, input_data: HandoffData):
-    with st.sidebar:
-        st.write(
-            f"""
-            Handing off to {input_data.to_agent_name}
-            Reason: {input_data.reason}
-            Issue Type: {input_data.issue_type}
-            Description: {input_data.issue_description}
-            """
-        )
-
-def make_handoff(agent):
-    return handoff(
-        agent=agent,
-        on_handoff=handle_handoff,
-        input_type=HandoffData,
-        input_filter=handoff_filters.remove_all_tools,
-    )
-
-# 모든 에이전트에 handoffs 설정
-all_agents = [triage_agent, menu_agent, order_agent, reservation_agent, complaints_agent]
-for agent in all_agents:
-    agent.handoffs = [make_handoff(other_agent) for other_agent in all_agents if other_agent != agent]
 
 
 
@@ -70,8 +41,6 @@ if "agent" not in st.session_state:
 if "current_agent_display" not in st.session_state:
     st.session_state["current_agent_display"] = f"Current Assistant: {triage_agent.name}"
 
-
-
 async def paint_history():
     messages = await session.get_items()
     for message in messages:
@@ -81,15 +50,15 @@ async def paint_history():
                     st.write(message["content"])
                 else:
                     if message["type"] == "message":
-                        content = message["content"][0]["text"] if isinstance(message["content"], list) else message["content"]
-                        st.write(content.replace("$", "\$"))
+                        st.write(message["content"][0]["text"].replace("$", "\$"))
+
 
 
 asyncio.run(paint_history())
 
 
 async def run_agent(message):
-
+    
     with st.chat_message("ai"):
         text_placeholder = st.empty()
         response = ""
@@ -115,23 +84,38 @@ async def run_agent(message):
                 elif event.type == "agent_updated_stream_event":
 
                     if st.session_state["agent"].name != event.new_agent.name:
-                        if "handoff_count" not in st.session_state: st.session_state["handoff_count"] = 0
-                        st.session_state["handoff_count"] += 1
-                        if st.session_state["handoff_count"] > 1: continue 
-                        st.write(f"🤖 Transferred from {st.session_state['agent'].name} to {event.new_agent.name}")
-                        st.session_state["agent"] = event.new_agent
-                        st.session_state["current_agent_display"] = f"Current Assistant: {event.new_agent.name}"
+                        
+                        st.write(f"🤖 Transfered from {st.session_state["agent"].name} to {event.new_agent.name}")
 
-                        with st.sidebar:  
-                            st.markdown("### Assistant Status")
-                            agent_status = st.empty()
-                            agent_status.markdown(st.session_state["current_agent_display"])
+                        st.session_state["agent"] = event.new_agent
+
                         text_placeholder = st.empty()
+
                         st.session_state["text_placeholder"] = text_placeholder
                         response = ""
 
         except InputGuardrailTripwireTriggered:
-            st.write("I can't help you with that. Your request seems to be off-topic. Please ask something related to Kimbap Heaven's menu, orders, reservations, or complaints.")
+            st.write(
+                "죄송해요, 저는 **김밥천국 전용 AI 어시스턴트**라 해당 질문엔 답변드리기 어렵습니다. 🙏\n\n"
+                "아래와 같은 내용은 도와드릴 수 있어요:\n"
+                "- 🍱 메뉴 추천 및 안내\n"
+                "- 🛒 주문 접수 및 결제\n"
+                "- 📅 예약 문의\n"
+                "- 📢 불만 및 피드백 접수\n\n"
+                "김밥천국 관련해서 궁금한 점을 말씀해 주세요!"
+    )
+
+        except OutputGuardrailTripwireTriggered:
+            st.session_state["text_placeholder"].empty()
+            st.write(
+                "죄송해요, 저는 **김밥천국 전용 AI 어시스턴트**라 해당 질문엔 답변드리기 어렵습니다. 🙏\n\n"
+                "아래와 같은 내용은 도와드릴 수 있어요:\n"
+                "- 🍱 메뉴 추천 및 안내\n"
+                "- 🛒 주문 접수 및 결제\n"
+                "- 📅 예약 문의\n"
+                "- 📢 불만 및 피드백 접수\n\n"
+                "김밥천국 관련해서 궁금한 점을 말씀해 주세요!"
+    )
 
 
 message = st.chat_input(

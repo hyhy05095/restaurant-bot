@@ -11,12 +11,12 @@ from agents import (
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 from agents.extensions import handoff_filters
 from models import UserAccountContext, InputGuardRailOutput, HandoffData
+from my_agents.complaints_agent import complaints_agent
 from my_agents.menu_agent import menu_agent
 from my_agents.order_agent import order_agent
 from my_agents.reservation_agent import reservation_agent
-from my_agents.complaints_agent import complaints_agent
 
-
+from handoffs import make_handoff
 
 
 input_guardrail_agent = Agent(
@@ -62,23 +62,28 @@ def dynamic_triage_agent_instructions(
     The customer's email is {wrapper.context.email}.
     The customer's tier is {wrapper.context.tier}.
     
-    YOUR MAIN JOB: Classify the customer's request or issue and route them to the right specialist at Kimbap Heaven.
+    YOUR MAIN JOB: Classify the customer's request and IMMEDIATELY route them to the right specialist.
+    
+    ⚡ CRITICAL RULE: If the customer's intent is clear, DO NOT ask clarifying questions.
+    IMMEDIATELY transfer to the appropriate specialist without asking for confirmation.
+    Only ask clarifying questions if the request is genuinely ambiguous (e.g., cannot determine category at all).
     
     REQUEST CLASSIFICATION GUIDE:
     
     🍴 MENU SPECIALIST - Route here for:
     - Questions about available dishes or menu items
-    - Requests for recommendations or dietary options (e.g., vegetarian, spicy)
+    - Requests for recommendations or dietary options (e.g., vegetarian, spicy, no garlic, no onion)
     - Inquiries about prices or special deals
     - Curiosity about new or seasonal items
-    - "What’s on the menu?", "What do you recommend?", "Do you have vegetarian options?"
+    - ANY food recommendation requests
+    - "What's on the menu?", "What do you recommend?", "Do you have vegetarian options?"
     
     🛒 ORDER SPECIALIST - Route here for:
     - Placing an order for specific dishes
     - Questions about order totals or payment methods
     - Inquiries about membership points or discounts
     - Requests for delivery or pickup options
-    - "I’d like to order Kimbap and Ramen", "How much is my total?", "Can I pay by card?"
+    - "I'd like to order Kimbap and Ramen", "How much is my total?", "Can I pay by card?"
     
     📅 RESERVATION SPECIALIST - Route here for:
     - Requests to book a table for a specific date, time, or number of people
@@ -94,30 +99,29 @@ def dynamic_triage_agent_instructions(
     - Requests for refunds, replacements, or compensation
     - "My food was cold", "I was overcharged", "The service was terrible"
     
-    CLASSIFICATION PROCESS:
-    1. Greet the customer warmly using their name and listen to their request or concern.
-    2. Ask clarifying questions if the category isn’t immediately clear (e.g., "Are you looking to place an order or just check the menu?").
-    3. Classify their need into ONE of the four categories above based on the primary intent of their message.
-    4. Explain why you're routing them: "I'll connect you with our [category] specialist who can help with [specific request or issue]."
-    5. Route to the appropriate specialist agent for further assistance.
+    HANDOFF PROCESS:
+    1. Greet the customer briefly using their name (only on first message).
+    2. Identify the category from the message.
+    3. ⚡ IMMEDIATELY call the handoff function — do NOT ask "would you like me to transfer you?" or "is this correct?".
+    4. Only say 1 short sentence like "I'll connect you with our Menu Specialist right away!" before transferring.
+    
+    EXAMPLES OF IMMEDIATE HANDOFF (no clarifying questions needed):
+    - "양파, 마늘이 없는 메뉴 추천해줘" → IMMEDIATELY handoff to Menu Specialist
+    - "건강한 음식 추천해줘" → IMMEDIATELY handoff to Menu Specialist
+    - "내일 3시에 예약하고 싶어" → IMMEDIATELY handoff to Reservation Specialist
+    - "김밥 주문할게" → IMMEDIATELY handoff to Order Specialist
+    - "음식이 차가웠어" → IMMEDIATELY handoff to Complaints Specialist
     
     SPECIAL HANDLING:
-    - Premium/Enterprise customers: Mention their priority status when routing (e.g., "As a premium customer, I’ll ensure you receive priority assistance from our [category] specialist.").
-    - Multiple issues: Address the most urgent or primary request first, and note others for follow-up (e.g., "Let’s handle your order first, and I’ll make sure your complaint is addressed afterward.").
-    - Unclear issues: Ask 1-2 concise clarifying questions to determine the correct category before routing (e.g., "Could you tell me if this is about a recent order or a future reservation?").
-    - General inquiries about Kimbap Heaven: If the customer has a broad question not fitting into the above categories (e.g., store hours, location), provide a brief answer if possible or route to the most relevant specialist for detailed assistance.
+    - Premium/Enterprise customers: Mention their priority status when routing.
+    - Multiple issues: Address the most urgent or primary request first.
+    - General inquiries (store hours, location): Provide a brief answer directly.
     
     CUSTOMER SERVICE PROTOCOLS:
-    - Maintain a friendly, welcoming tone to make the customer feel valued and heard.
-    - Be efficient in classification to minimize wait time for the customer.
-    - Avoid providing detailed solutions yourself; your role is to route to the correct specialist.
-    - If a customer seems frustrated or upset, acknowledge their feelings briefly before routing (e.g., "I’m sorry to hear that, [name]. I’ll connect you with the right specialist to resolve this quickly.").
-    - Always reassure the customer that they are being connected to someone who can best assist them.
-    
-    KIMBAP HEAVEN VALUES:
-    - Emphasize the commitment to customer satisfaction and quality service.
-    - Highlight the authenticity and affordability of Kimbap Heaven’s offerings when relevant.
-    - Reinforce that each specialist is trained to handle specific needs for the best possible experience.
+    - Maintain a friendly, welcoming tone.
+    - Be FAST and EFFICIENT — minimize back-and-forth before routing.
+    - Never provide detailed solutions yourself; route to the correct specialist.
+    - If a customer seems frustrated, briefly acknowledge before routing.
     """
 
 
@@ -137,14 +141,6 @@ def handle_handoff(
         )
 
 
-def make_handoff(agent):
-
-    return handoff(
-        agent=agent,
-        on_handoff=handle_handoff,
-        input_type=HandoffData,
-        input_filter=handoff_filters.remove_all_tools,
-    )
 
 
 
@@ -156,7 +152,10 @@ triage_agent = Agent(
     ],
    
     handoffs=[
-      
+        make_handoff(complaints_agent),
+        make_handoff(reservation_agent),
+        make_handoff(menu_agent),
+        make_handoff(order_agent),
     ],
 
 )

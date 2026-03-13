@@ -1,5 +1,17 @@
 from agents import Agent, RunContextWrapper
 from models import UserAccountContext
+from tools import (
+    create_complaint_ticket,
+    process_refund,
+    issue_compensation,
+    escalate_to_manager,
+    log_hygiene_issue,
+    get_customer_history,
+    AgentToolUsageLoggingHooks,
+)
+from output_guardrails import technical_output_guardrail
+
+
 
 def dynamic_complaints_agent_instructions(
     wrapper: RunContextWrapper[UserAccountContext],
@@ -46,11 +58,34 @@ def dynamic_complaints_agent_instructions(
     - Encourage the customer to return by showing genuine concern and appreciation.
     
     {"PREMIUM FEATURES: Priority complaint resolution, dedicated support, and enhanced compensation options (e.g., higher discounts or exclusive offers)." if wrapper.context.tier != "basic" else ""}
+
+    HANDOFF INSTRUCTIONS:
+    When the customer's request is outside your specialty:
+    1. Acknowledge their request
+    2. Explain that you'll connect them to the right specialist
+    3. Use the handoff function with appropriate details:
+       - to_agent_name: [Target agent name]
+       - issue_type: [Type of request]
+       - issue_description: [Brief description of what the customer needs]
+       - reason: [Why you're transferring them]
     """
+
+
 
 
 complaints_agent = Agent(
     name="Complaints Support Agent",
     instructions=dynamic_complaints_agent_instructions,
-    handoffs=[]  # handoffs는 main.py에서 설정
+    tools=[
+        create_complaint_ticket,
+        process_refund,
+        issue_compensation,
+        escalate_to_manager,
+        log_hygiene_issue,
+        get_customer_history,
+    ],
+    hooks=AgentToolUsageLoggingHooks(),
+    output_guardrails=[
+        technical_output_guardrail,
+    ],
 )
