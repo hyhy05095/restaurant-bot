@@ -9,3 +9,12 @@ wheels/
 # Virtual environments
 .venv
 .env
+.streamlit/secrets.toml
+
+# DB / 유저 데이터
+*.db
+users.json
+
+# IDE
+.vscode/
+.idea/

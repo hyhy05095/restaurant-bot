@@ -3,7 +3,11 @@ dotenv.load_dotenv()
 
 from openai import OpenAI
 import asyncio
+
 import streamlit as st
+import os
+os.environ.setdefault("OPENAI_API_KEY", st.secrets.get("OPENAI_API_KEY", ""))
+
 from agents import Runner, SQLiteSession, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 import pandas as pd
 import json
@@ -282,6 +286,15 @@ async def run_agent(message):
             st.chat_message("ai").markdown(
                 "죄송해요, 해당 내용은 안전 정책상 보여드리기 어렵습니다. 🙏\n\n"
                 "김밥천국 관련해서 다시 질문해 주세요!"
+            )
+
+        except Exception as e:
+            st.session_state["text_placeholder"].empty()
+            st.session_state["agent"] = triage_agent  # 에이전트 초기화
+            st.error(
+                "**⚠️ 일시적인 오류가 발생했어요**\n\n"
+                "잠시 후 다시 질문해 주시면 도와드릴게요 😊\n\n"
+                f"```\n{type(e).__name__}: {str(e)[:100]}\n```"
             )
 
 # ─── 빠른 메뉴 버튼 자동 실행 ───────────────────────────────────
